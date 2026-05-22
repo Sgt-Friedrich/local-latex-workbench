@@ -1,0 +1,71 @@
+{
+  "Figure": {
+    "prefix": "fig",
+    "body": [
+      "\\begin{figure}[htbp]",
+      "  \\centering",
+      "  \\includegraphics[width=${1:0.8}\\linewidth]{figures/${2:image.png}}",
+      "  \\caption{${3:caption}}",
+      "  \\label{fig:${4:label}}",
+      "\\end{figure}"
+    ],
+    "description": "Insert a figure from the figures folder"
+  },
+  "Equation": {
+    "prefix": "eq",
+    "body": [
+      "\\begin{equation}",
+      "  ${1:E = mc^2}",
+      "\\end{equation}"
+    ],
+    "description": "Insert a numbered equation"
+  },
+  "Booktabs Table": {
+    "prefix": "tbl",
+    "body": [
+      "\\begin{table}[htbp]",
+      "  \\centering",
+      "  \\caption{${1:caption}}",
+      "  \\label{tab:${2:label}}",
+      "  \\begin{tabular}{${3:lll}}",
+      "    \\toprule",
+      "    ${4:Column 1} & ${5:Column 2} & ${6:Column 3} \\\\",
+      "    \\midrule",
+      "    ${7:A} & ${8:B} & ${9:C} \\\\",
+      "    \\bottomrule",
+      "  \\end{tabular}",
+      "\\end{table}"
+    ],
+    "description": "Insert a booktabs table"
+  },
+  "Section": {
+    "prefix": "sec",
+    "body": [
+      "\\section{${1:Title}}",
+      "",
+      "$0"
+    ],
+    "description": "Insert a section heading"
+  },
+  "Package": {
+    "prefix": "pkg",
+    "body": [
+      "\\usepackage{${1:package}}"
+    ],
+    "description": "Insert a package import"
+  },
+  "Reference": {
+    "prefix": "ref",
+    "body": [
+      "\\ref{${1:label}}"
+    ],
+    "description": "Insert a reference"
+  },
+  "Citation": {
+    "prefix": "cite",
+    "body": [
+      "\\cite{${1:key}}"
+    ],
+    "description": "Insert a citation"
+  }
+}

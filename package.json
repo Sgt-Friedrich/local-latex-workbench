@@ -1,0 +1,181 @@
+{
+  "name": "local-latex-workbench",
+  "displayName": "Local LaTeX Workbench",
+  "description": "Overleaf-like local LaTeX workflow for VS Code: build, preview, image gallery, and figure insertion.",
+  "version": "0.10.7",
+  "publisher": "ah-local",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:latex",
+    "onCommand:localLatex.newProject",
+    "onCommand:localLatex.importTex",
+    "onCommand:localLatex.importProjectZip",
+    "onCommand:localLatex.exportProjectZip",
+    "onCommand:localLatex.exportPdf",
+    "onCommand:localLatex.initWorkspace",
+    "onCommand:localLatex.addPackage",
+    "onCommand:localLatex.installPackage",
+    "onCommand:localLatex.ensureCommonPackages",
+    "onCommand:localLatex.build",
+    "onCommand:localLatex.openPreview",
+    "onCommand:localLatex.openPdf",
+    "onCommand:localLatex.clean",
+    "onCommand:localLatex.insertImage",
+    "onCommand:localLatex.pasteClipboardImage",
+    "onCommand:localLatex.refreshGallery",
+    "onView:localLatexWorkbench",
+    "onView:localLatexGallery"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "localLatex.newProject",
+        "title": "Local LaTeX: New Project from Template"
+      },
+      {
+        "command": "localLatex.importTex",
+        "title": "Local LaTeX: Import TeX File / 导入 TeX 文件"
+      },
+      {
+        "command": "localLatex.importProjectZip",
+        "title": "Local LaTeX: Import Project from ZIP"
+      },
+      {
+        "command": "localLatex.exportProjectZip",
+        "title": "Local LaTeX: Export Project as ZIP"
+      },
+      {
+        "command": "localLatex.exportPdf",
+        "title": "Local LaTeX: Export PDF As..."
+      },
+      {
+        "command": "localLatex.initWorkspace",
+        "title": "Local LaTeX: Initialize Workspace"
+      },
+      {
+        "command": "localLatex.addPackage",
+        "title": "Local LaTeX: Add Common Package"
+      },
+      {
+        "command": "localLatex.installPackage",
+        "title": "Local LaTeX: Install MiKTeX Package"
+      },
+      {
+        "command": "localLatex.ensureCommonPackages",
+        "title": "Local LaTeX: Install Packages Used by Main File"
+      },
+      {
+        "command": "localLatex.build",
+        "title": "Local LaTeX: Build Main File"
+      },
+      {
+        "command": "localLatex.openPreview",
+        "title": "Local LaTeX: Open Live Preview"
+      },
+      {
+        "command": "localLatex.openPdf",
+        "title": "Local LaTeX: Open PDF"
+      },
+      {
+        "command": "localLatex.clean",
+        "title": "Local LaTeX: Clean Build Output"
+      },
+      {
+        "command": "localLatex.insertImage",
+        "title": "Local LaTeX: Insert Image as Figure"
+      },
+      {
+        "command": "localLatex.pasteClipboardImage",
+        "title": "Local LaTeX: Paste Clipboard Image as Figure"
+      },
+      {
+        "command": "localLatex.refreshGallery",
+        "title": "Local LaTeX: Refresh Image Gallery"
+      }
+    ],
+    "configuration": {
+      "title": "Local LaTeX Workbench",
+      "properties": {
+        "localLatex.mainFile": {
+          "type": "string",
+          "default": "main.tex",
+          "description": "Main TeX file to build."
+        },
+        "localLatex.outputDir": {
+          "type": "string",
+          "default": "build",
+          "description": "Directory for generated PDF and auxiliary files."
+        },
+        "localLatex.figuresDir": {
+          "type": "string",
+          "default": "figures",
+          "description": "Directory for inserted images."
+        },
+        "localLatex.enginePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to xelatex. Leave empty to auto-detect."
+        },
+        "localLatex.figureWidth": {
+          "type": "string",
+          "default": "0.8",
+          "description": "Default figure width as a fraction of \\linewidth."
+        },
+        "localLatex.autoBuildOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Build the main file automatically when a .tex file is saved."
+        },
+        "localLatex.openPreviewAfterBuild": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open or refresh the right-side PDF preview after builds."
+        },
+        "localLatex.forwardSyncOnCursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the preview is open, move the PDF preview to the current TeX cursor position."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "localLatex",
+          "title": "LaTeX",
+          "icon": "resources/latex.svg"
+        }
+      ]
+    },
+    "views": {
+      "localLatex": [
+        {
+          "id": "localLatexWorkbench",
+          "name": "Workbench / \u5de5\u4f5c\u53f0",
+          "type": "webview"
+        },
+        {
+          "id": "localLatexGallery",
+          "name": "Image Gallery / \u56fe\u7247",
+          "type": "webview"
+        }
+      ]
+    },
+    "snippets": [
+      {
+        "language": "latex",
+        "path": "./snippets/latex.json"
+      }
+    ]
+  },
+  "scripts": {
+    "check": "node --check extension.js"
+  },
+  "devDependencies": {}
+}
