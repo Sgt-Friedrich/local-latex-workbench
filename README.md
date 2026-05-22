@@ -10,6 +10,7 @@ Local LaTeX Workbench is a small VS Code extension for an Overleaf-like local wr
 - Import a project from a ZIP archive.
 - Export the current project as a ZIP archive.
 - Export the generated PDF to a chosen location.
+- Show a Structure / 目录 tree for `\part`, `\chapter`, `\section`, `\subsection`, and included `.tex` files.
 - Initialize a LaTeX workspace with `main.tex`, `build/`, and `figures/`.
 - Build the main TeX file with XeLaTeX twice.
 - Open a right-side PDF.js preview with build, export, open, page navigation, and zoom controls.
@@ -33,6 +34,7 @@ Open the LaTeX activity bar and use `Workbench / 工作台`.
 - `开始 / Start`: create projects from template cards.
 - `当前项目 / Current Project`: initialize, build, preview, open PDF, clean, and install used packages.
 - `图片 / Images`: add images or paste screenshots.
+- `Structure / 目录`: browse the document outline and click a heading to jump to its source line.
 - `导入导出 / Import & Export`: import ZIP, export ZIP, and export PDF.
 - `常用包 / Common Packages`: add or install common packages with buttons.
 
@@ -54,6 +56,7 @@ Open the LaTeX activity bar and use `Workbench / 工作台`.
 - `Local LaTeX: Insert Image as Figure`
 - `Local LaTeX: Paste Clipboard Image as Figure`
 - `Local LaTeX: Refresh Image Gallery`
+- `Local LaTeX: Refresh Structure`
 
 ## Settings
 

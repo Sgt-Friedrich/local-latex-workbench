@@ -2,7 +2,7 @@
   "name": "local-latex-workbench",
   "displayName": "Local LaTeX Workbench",
   "description": "Overleaf-like local LaTeX workflow for VS Code: build, preview, image gallery, and figure insertion.",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "publisher": "ah-local",
   "license": "MIT",
   "repository": {
@@ -38,8 +38,11 @@
     "onCommand:localLatex.insertImage",
     "onCommand:localLatex.pasteClipboardImage",
     "onCommand:localLatex.refreshGallery",
+    "onCommand:localLatex.refreshStructure",
+    "onCommand:localLatex.openStructureItem",
     "onView:localLatexWorkbench",
-    "onView:localLatexGallery"
+    "onView:localLatexGallery",
+    "onView:localLatexStructure"
   ],
   "contributes": {
     "commands": [
@@ -106,6 +109,10 @@
       {
         "command": "localLatex.refreshGallery",
         "title": "Local LaTeX: Refresh Image Gallery"
+      },
+      {
+        "command": "localLatex.refreshStructure",
+        "title": "Local LaTeX: Refresh Structure / 刷新目录"
       }
     ],
     "configuration": {
@@ -173,9 +180,28 @@
           "id": "localLatexGallery",
           "name": "Image Gallery / \u56fe\u7247",
           "type": "webview"
+        },
+        {
+          "id": "localLatexStructure",
+          "name": "Structure / \u76ee\u5f55"
         }
       ]
     },
+    "menus": {
+      "view/title": [
+        {
+          "command": "localLatex.refreshStructure",
+          "when": "view == localLatexStructure",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "localLatexStructure",
+        "contents": "Open a LaTeX workspace with `main.tex` to show sections, chapters, and included files."
+      }
+    ],
     "snippets": [
       {
         "language": "latex",

@@ -102,21 +102,25 @@ const PROJECT_TEMPLATES = [
 let output;
 let galleryProvider;
 let dashboardProvider;
+let structureProvider;
 let extensionUri;
 let previewPanel;
 let isBuilding = false;
 let queuedBuildOptions = null;
 let suppressAutoBuildOnSave = 0;
 let forwardSyncTimer = undefined;
+let structureRefreshTimer = undefined;
 
 function activate(context) {
   extensionUri = context.extensionUri;
   output = vscode.window.createOutputChannel('Local LaTeX');
   dashboardProvider = new DashboardProvider();
   galleryProvider = new GalleryProvider(context.extensionUri);
+  structureProvider = new StructureProvider();
   context.subscriptions.push(output);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('localLatexWorkbench', dashboardProvider));
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('localLatexGallery', galleryProvider));
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('localLatexStructure', structureProvider));
 
   context.subscriptions.push(vscode.commands.registerCommand('localLatex.newProject', newProjectFromTemplate));
   context.subscriptions.push(vscode.commands.registerCommand('localLatex.importTex', importTexFile));
@@ -134,13 +138,29 @@ function activate(context) {
   context.subscriptions.push(vscode.commands.registerCommand('localLatex.insertImage', pickAndInsertImage));
   context.subscriptions.push(vscode.commands.registerCommand('localLatex.pasteClipboardImage', pasteClipboardImage));
   context.subscriptions.push(vscode.commands.registerCommand('localLatex.refreshGallery', () => galleryProvider.refresh()));
+  context.subscriptions.push(vscode.commands.registerCommand('localLatex.refreshStructure', () => structureProvider.refresh()));
+  context.subscriptions.push(vscode.commands.registerCommand('localLatex.openStructureItem', openStructureItem));
 
   context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((document) => {
+    scheduleStructureRefresh(document, 0);
     const config = getConfig();
     if (suppressAutoBuildOnSave > 0 || !config.get('autoBuildOnSave') || document.languageId !== 'latex') {
       return;
     }
     buildMainFile({ silent: true }).catch((error) => showError(error));
+  }));
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
+    scheduleStructureRefresh(event.document, 350);
+  }));
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (editor?.document) {
+      scheduleStructureRefresh(editor.document, 150);
+    }
+  }));
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('localLatex.mainFile')) {
+      structureProvider.refresh();
+    }
   }));
   context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection((event) => {
     scheduleSourceSyncToPdf(event);
@@ -342,6 +362,7 @@ async function importTexFile() {
   await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
   dashboardProvider.refresh();
   galleryProvider.refresh();
+  structureProvider.refresh();
 
   const next = await vscode.window.showInformationMessage(`已导入 TeX 文件：${mainRelative}`, '编译预览');
   if (next === '编译预览') {
@@ -482,6 +503,7 @@ async function initWorkspace() {
   await ensureGitKeep(figuresDir);
   await writeWorkspaceDefaults(root);
   galleryProvider.refresh();
+  structureProvider.refresh();
   vscode.window.showInformationMessage(`Local LaTeX workspace initialized: ${root}`);
 }
 
@@ -643,6 +665,28 @@ function getPdfPath() {
   const { mainFile, outputDir } = getPaths();
   const stem = path.basename(mainFile, path.extname(mainFile));
   return path.join(outputDir, `${stem}.pdf`);
+}
+
+function scheduleStructureRefresh(document, delay = 250) {
+  if (!structureProvider || !document || document.uri.scheme !== 'file') {
+    return;
+  }
+  const ext = path.extname(document.uri.fsPath).toLowerCase();
+  if (document.languageId !== 'latex' && ext !== '.tex') {
+    return;
+  }
+  try {
+    const { root } = getPaths();
+    if (!isPathInsideOrEqual(root, document.uri.fsPath)) {
+      return;
+    }
+  } catch {
+    return;
+  }
+  clearTimeout(structureRefreshTimer);
+  structureRefreshTimer = setTimeout(() => {
+    structureProvider.refresh();
+  }, delay);
 }
 
 function scheduleSourceSyncToPdf(event) {
@@ -865,6 +909,266 @@ async function revealSourceLocation(file, line, column) {
   const position = new vscode.Position(Math.max(0, line - 1), Math.max(0, column - 1));
   editor.selection = new vscode.Selection(position, position);
   editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+}
+
+async function openStructureItem(item) {
+  if (!item?.file) {
+    return;
+  }
+  await revealSourceLocation(item.file, item.line || 1, item.column || 1);
+}
+
+async function readLatexStructure() {
+  const { root, mainFile } = getPaths();
+  if (!fs.existsSync(mainFile)) {
+    return [createStructureMessage('Main file not found / 未找到主文件', path.basename(mainFile))];
+  }
+
+  const flatItems = [];
+  const seen = new Set();
+  parseStructureFile(mainFile, root, seen, flatItems);
+  if (flatItems.length === 0) {
+    return [createStructureMessage('No sections found / 暂无章节', 'Use \\section, \\chapter, etc.')];
+  }
+  return nestStructureItems(flatItems);
+}
+
+function parseStructureFile(file, root, seen, out) {
+  const normalizedFile = normalizeCasePath(file);
+  if (seen.has(normalizedFile) || seen.size > 100 || !fs.existsSync(file)) {
+    return;
+  }
+  seen.add(normalizedFile);
+
+  const text = fs.readFileSync(file, 'utf8');
+  const stripped = stripLatexComments(text);
+  const lineStarts = computeLineStarts(stripped);
+  const events = [
+    ...findStructureHeadings(stripped, lineStarts, file, root),
+    ...findStructureIncludes(stripped, lineStarts, file, root)
+  ].sort((a, b) => a.index - b.index);
+
+  for (const event of events) {
+    if (event.kind === 'heading') {
+      out.push(event.item);
+    } else if (event.kind === 'include') {
+      parseStructureFile(event.file, root, seen, out);
+    }
+  }
+}
+
+function findStructureHeadings(text, lineStarts, file, root) {
+  const events = [];
+  const regex = /\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?\s*(?:\[[^\]\r\n]*\]\s*)?\{/g;
+  let match;
+  while ((match = regex.exec(text))) {
+    const openBrace = regex.lastIndex - 1;
+    const title = readBalancedBrace(text, openBrace);
+    if (!title) {
+      continue;
+    }
+    const line = lineNumberAtIndex(lineStarts, match.index);
+    const command = match[1];
+    events.push({
+      kind: 'heading',
+      index: match.index,
+      item: {
+        label: cleanLatexTitle(title.content) || `\\${command}`,
+        description: `${path.relative(root, file).replace(/\\/g, '/')}:${line}`,
+        command,
+        level: structureLevel(command),
+        line,
+        column: 1,
+        file,
+        children: []
+      }
+    });
+    regex.lastIndex = title.end + 1;
+  }
+  return events;
+}
+
+function findStructureIncludes(text, lineStarts, file, root) {
+  const events = [];
+  const regex = /\\(input|include|subfile)\s*\{/g;
+  let match;
+  while ((match = regex.exec(text))) {
+    const openBrace = regex.lastIndex - 1;
+    const arg = readBalancedBrace(text, openBrace);
+    if (!arg) {
+      continue;
+    }
+    const includePath = resolveLatexInclude(arg.content, file, root);
+    if (includePath) {
+      events.push({
+        kind: 'include',
+        index: match.index,
+        file: includePath,
+        line: lineNumberAtIndex(lineStarts, match.index)
+      });
+    }
+    regex.lastIndex = arg.end + 1;
+  }
+  return events;
+}
+
+function resolveLatexInclude(rawValue, currentFile, root) {
+  const value = rawValue.trim().replace(/^["']|["']$/g, '');
+  if (!value || /^[a-z]+:/i.test(value)) {
+    return '';
+  }
+  const candidates = [];
+  const basePaths = path.isAbsolute(value)
+    ? [value]
+    : [path.resolve(path.dirname(currentFile), value), path.resolve(root, value)];
+  for (const base of basePaths) {
+    candidates.push(base);
+    if (!path.extname(base)) {
+      candidates.push(`${base}.tex`);
+    }
+  }
+  return candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) || '';
+}
+
+function nestStructureItems(items) {
+  const roots = [];
+  const stack = [];
+  for (const item of items) {
+    while (stack.length && stack[stack.length - 1].level >= item.level) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1];
+    if (parent) {
+      parent.children.push(item);
+    } else {
+      roots.push(item);
+    }
+    stack.push(item);
+  }
+  return roots;
+}
+
+function createStructureMessage(label, description) {
+  return {
+    label,
+    description,
+    command: 'message',
+    level: 0,
+    line: 0,
+    column: 0,
+    file: '',
+    children: []
+  };
+}
+
+function structureLevel(command) {
+  return {
+    part: 0,
+    chapter: 1,
+    section: 2,
+    subsection: 3,
+    subsubsection: 4,
+    paragraph: 5,
+    subparagraph: 6
+  }[command] ?? 9;
+}
+
+function structureIcon(command) {
+  return {
+    part: 'symbol-namespace',
+    chapter: 'symbol-class',
+    section: 'symbol-method',
+    subsection: 'symbol-property',
+    subsubsection: 'symbol-field',
+    paragraph: 'symbol-string',
+    subparagraph: 'symbol-key'
+  }[command] || 'list-tree';
+}
+
+function cleanLatexTitle(value) {
+  return value
+    .replace(/\\texorpdfstring\s*\{([^{}]*)\}\s*\{[^{}]*\}/g, '$1')
+    .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}/g, '$1')
+    .replace(/\\[a-zA-Z]+\*?/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function readBalancedBrace(text, openBrace) {
+  if (text[openBrace] !== '{') {
+    return undefined;
+  }
+  let depth = 0;
+  for (let index = openBrace; index < text.length; index += 1) {
+    const char = text[index];
+    if (isEscaped(text, index)) {
+      continue;
+    }
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          content: text.slice(openBrace + 1, index),
+          end: index
+        };
+      }
+    }
+  }
+  return undefined;
+}
+
+function stripLatexComments(text) {
+  return text.split(/(\r?\n)/).map((part) => {
+    if (/^\r?\n$/.test(part)) {
+      return part;
+    }
+    for (let index = 0; index < part.length; index += 1) {
+      if (part[index] === '%' && !isEscaped(part, index)) {
+        return `${part.slice(0, index)}${' '.repeat(part.length - index)}`;
+      }
+    }
+    return part;
+  }).join('');
+}
+
+function isEscaped(text, index) {
+  let slashCount = 0;
+  for (let i = index - 1; i >= 0 && text[i] === '\\'; i -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
+}
+
+function computeLineStarts(text) {
+  const starts = [0];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === '\n') {
+      starts.push(index + 1);
+    }
+  }
+  return starts;
+}
+
+function lineNumberAtIndex(lineStarts, index) {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (lineStarts[middle] <= index) {
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return high + 1;
+}
+
+function normalizeCasePath(file) {
+  const resolved = path.resolve(file);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 async function cleanOutput() {
@@ -1318,6 +1622,52 @@ class LatexCompletionProvider {
       items.push(item);
     }
     return items;
+  }
+}
+
+class StructureProvider {
+  constructor() {
+    this._onDidChangeTreeData = new vscode.EventEmitter();
+    this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+  }
+
+  refresh() {
+    this._onDidChangeTreeData.fire();
+  }
+
+  async getChildren(element) {
+    if (element) {
+      return element.children || [];
+    }
+    try {
+      return await readLatexStructure();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      output?.appendLine(message);
+      return [createStructureMessage('Structure failed / 目录解析失败', message)];
+    }
+  }
+
+  getTreeItem(item) {
+    const hasChildren = Boolean(item.children?.length);
+    const treeItem = new vscode.TreeItem(
+      item.label,
+      hasChildren ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None
+    );
+    treeItem.description = item.description;
+    treeItem.tooltip = item.file
+      ? `${item.command} · ${item.description}`
+      : item.description;
+    treeItem.contextValue = item.file ? 'latexStructureItem' : 'latexStructureMessage';
+    treeItem.iconPath = new vscode.ThemeIcon(structureIcon(item.command));
+    if (item.file) {
+      treeItem.command = {
+        command: 'localLatex.openStructureItem',
+        title: 'Open Source',
+        arguments: [item]
+      };
+    }
+    return treeItem;
   }
 }
 
