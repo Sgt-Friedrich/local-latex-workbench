@@ -4,6 +4,15 @@
   "description": "Overleaf-like local LaTeX workflow for VS Code: build, preview, image gallery, and figure insertion.",
   "version": "0.10.7",
   "publisher": "ah-local",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sgt-Friedrich/local-latex-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sgt-Friedrich/local-latex-workbench/issues"
+  },
+  "homepage": "https://github.com/Sgt-Friedrich/local-latex-workbench#readme",
   "engines": {
     "vscode": "^1.90.0"
   },
